@@ -44,6 +44,29 @@ class StereoDepthKITTI(Dataset):
 
     return img0, img1, disp
 
+class StereoDepthKITTITest(Dataset):
+    def __init__(self, root_dir, transform=None):
+        super().__init__()
+        self.left_paths  = sorted(glob(os.path.join(root_dir, 'testing/image_2/*_10.png')))
+        self.right_paths = sorted(glob(os.path.join(root_dir, 'testing/image_3/*_10.png')))
+
+        print(f"[TEST] Left images : {len(self.left_paths)}")
+        print(f"[TEST] Right images: {len(self.right_paths)}")
+
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.left_paths)
+
+    def __getitem__(self, idx):
+        img0 = Image.open(self.left_paths[idx]).convert('RGB')
+        img1 = Image.open(self.right_paths[idx]).convert('RGB')
+
+        if self.transform:
+            img0 = self.transform(img0)
+            img1 = self.transform(img1)
+
+        return img0, img1
 
 class ResidualBlock(nn.Module):
     def __init__(self, in_ch, out_ch, stride=1):
@@ -121,20 +144,29 @@ class StereoNet(nn.Module):
   def forward(self, l, r):
     return self.agg2d(self.feat(l), self.feat(r))
   
-def evaluate_model(model, dataloader, device):
-  model.to(device)
-  model.eval()
-  total_error = 0.0
-  total_pixels = 0
-  with torch.no_grad():
-    for img, depth_gt in dataloader:
-      img = img.to(device)
-      depth_gt = depth_gt.to(device)
-      pred = model(img)
-      error = torch.abs(pred - depth_gt)
-      total_error += error.sum().item()
-      total_pixels += error.numel()
-  return total_error / total_pixels
+def calculate_mae(model, dataloader, device):
+    model.eval()
+    model.to(device)
+    total_abs_error = 0.0
+    total_pixels = 0
+    
+    with torch.no_grad():
+        for left_img, right_img, gt_disp in dataloader:
+            left_img = left_img.to(device)
+            right_img = right_img.to(device)
+            gt_disp = gt_disp.to(device)
+            
+            pred_disp = model(left_img, right_img)
+            pred_disp = pred_disp.squeeze(1)  # [B, H, W]
+            gt_disp = gt_disp.squeeze(1)      # [B, H, W]
+
+            mask = gt_disp > 0  # valid pixel mask (KITTI 같은 경우 0은 invalid)
+            abs_error = torch.abs(pred_disp[mask] - gt_disp[mask]).sum()
+            total_abs_error += abs_error.item()
+            total_pixels += mask.sum().item()
+
+    mae = total_abs_error / total_pixels
+    return mae
 
 if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -162,7 +194,7 @@ if __name__ == "__main__":
     
     dataset = StereoDepthKITTI(root_dir=root_dir, transform=transform)
     stereo_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True,  num_workers=num_workers, persistent_workers=True, pin_memory=True)
-
+    
     '''    
     for left, right, disp in stereo_loader:
         print(f"Left image shape     : {left.shape}")     # (B, 3, 224, 224)
@@ -231,7 +263,12 @@ if __name__ == "__main__":
     '''
     #best_path = os.path.join(model_dir, 'best_mono_model.pth')
     best_path = os.path.join(model_dir, 'best_stereo_model.pth')
+
+    save_disp_dir = os.path.join(root_dir, 'testing', 'pred_disp')
+    os.makedirs(save_disp_dir, exist_ok=True)
+
     model.load_state_dict(torch.load(best_path, map_location=device))
     model.to(device).eval()
-    val_mae = evaluate_model(model, mono_loader, device)
+
+    val_mae = calculate_mae(model, stereo_loader, device)
     print(f"Validation MAE: {val_mae:.4f}")
