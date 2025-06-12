@@ -272,8 +272,9 @@ if __name__ == "__main__":
     val_mae = calculate_mae(model, stereo_loader, device)
     print(f"Validation MAE: {val_mae:.4f}")
     '''
-
-    model.load_state_dict(torch.load(best_model_path, map_location=device))
+    '''
+    #training 첫 5개 이미지에 대한 깊이맵 생성 및 결과 비교
+    model.load_state_dict(torch.load("models/best_stereo_model.pth", map_location=device))
     model.to(device).eval()
 
     val_loader = DataLoader(dataset, batch_size=5, shuffle=False, num_workers=2, pin_memory=True)
@@ -282,7 +283,7 @@ if __name__ == "__main__":
     l_imgs, r_imgs, gt_disps = l_imgs.to(device), r_imgs.to(device), gt_disps.to(device)
 
     with torch.no_grad():
-    preds = model(l_imgs, r_imgs)
+      preds = model(l_imgs, r_imgs)
 
     fig, axes = plt.subplots(5, 3, figsize=(9, 15))
     with torch.no_grad():
@@ -308,4 +309,6 @@ if __name__ == "__main__":
         axes[i, 2].axis('off')
 
     plt.tight_layout()
-    plt.show()
+    os.makedirs("output", exist_ok=True)
+    plt.savefig("output/1_7.png")
+    '''
