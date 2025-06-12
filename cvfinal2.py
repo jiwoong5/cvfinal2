@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
+import torch.optim as optim
 
 from PIL import Image
 from torchvision import transforms
@@ -180,3 +181,20 @@ if __name__ == "__main__":
     print(f"Number of Samples: {len(dataset)}")
 
     model = UNetDepth().to(device)
+
+    #################################################
+    #################### TO DO ######################
+    #################################################
+
+    # 1. Loss function (Smooth L1 Loss = Huber Loss, 안정적이고 outlier에 덜 민감)
+    criterion = nn.SmoothL1Loss()
+
+    # 2. Optimizer (Adam: 학습 속도 빠르고 일반적으로 잘 작동)
+    optimizer = optim.Adam(model.parameters(), lr=1e-4, weight_decay=1e-5)
+
+    # 3. (Optional) Learning Rate Scheduler (CosineAnnealing은 부드럽게 감소)
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=20, eta_min=1e-6)
+
+    #################################################
+    #################################################
+    #################################################
