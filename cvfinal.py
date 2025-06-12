@@ -44,10 +44,97 @@ class StereoDepthKITTI(Dataset):
 
     return img0, img1, disp
 
-transform = transforms.Compose([
-    transforms.Resize((224, 224)),
-    transforms.ToTensor(),
-])
+
+class ResidualBlock(nn.Module):
+    def __init__(self, in_ch, out_ch, stride=1):
+        super().__init__()
+        self.conv1 = nn.Conv2d(in_ch, out_ch, kernel_size=3, stride=stride, padding=1)
+        self.bn1 = nn.BatchNorm2d(out_ch)
+        self.relu = nn.ReLU(inplace=True)
+        self.conv2 = nn.Conv2d(out_ch, out_ch, kernel_size=3, stride=1, padding=1)
+        self.bn2 = nn.BatchNorm2d(out_ch)
+        
+        if stride != 1 or in_ch != out_ch:
+            self.down = nn.Sequential(
+                nn.Conv2d(in_ch, out_ch, kernel_size=1, stride=stride, bias=False),
+                nn.BatchNorm2d(out_ch)
+            )
+        else:
+            self.down = nn.Identity()
+
+    def forward(self, x):
+        identity = self.down(x)
+        out = self.relu(self.bn1(self.conv1(x)))
+        out = self.bn2(self.conv2(out))
+        out += identity
+        out = self.relu(out)
+        return out
+
+class FeatureExtractor(nn.Module):
+    def __init__(self):
+        super().__init__()
+        # 초기 블록
+        self.initial = nn.Sequential(
+            nn.Conv2d(3, 32, kernel_size=3, stride=2, padding=1),
+            nn.BatchNorm2d(32),
+            nn.ReLU(inplace=True)
+        )
+        # 4개의 ResidualBlock 반복, 채널 32 유지, stride=1
+        self.layers = nn.Sequential(
+            ResidualBlock(32, 32, stride=1),
+            ResidualBlock(32, 32, stride=1),
+            ResidualBlock(32, 32, stride=1),
+            ResidualBlock(32, 32, stride=1),
+        )
+
+    def forward(self, x):
+        x = self.initial(x)
+        x = self.layers(x)
+        return x
+
+class CostVolume2DAggregation(nn.Module):
+  def __init__(self, max_disp=192):
+    super().__init__()
+    self.max_disp = max_disp
+    self.conv = nn.Sequential(
+      nn.Conv2d(max_disp,64,3,1,1), nn.BatchNorm2d(64), nn.ReLU(inplace=True),
+      nn.Conv2d(64,32,3,1,1),      nn.BatchNorm2d(32), nn.ReLU(inplace=True),
+      nn.ConvTranspose2d(32,1,4,2,1)
+    )
+  def forward(self, lf, rf):
+    B,C,H,W = lf.size()
+    cost = lf.new_zeros(B, self.max_disp, H, W)
+    for d in range(self.max_disp):
+      if d>0:
+        diff = F.l1_loss(lf[:,:,:,d:], rf[:,:,:,:-d], reduction='none')
+        cost[:,d,:,d:] = diff.mean(1)
+      else:
+        diff = F.l1_loss(lf, rf, reduction='none')
+        cost[:,d,:,:] = diff.mean(1)
+    return self.conv(cost)  # [B,1,224,224]
+
+class StereoNet(nn.Module):
+  def __init__(self, max_disp=192):
+    super().__init__()
+    self.feat  = FeatureExtractor()
+    self.agg2d = CostVolume2DAggregation(max_disp)
+  def forward(self, l, r):
+    return self.agg2d(self.feat(l), self.feat(r))
+  
+def evaluate_model(model, dataloader, device):
+  model.to(device)
+  model.eval()
+  total_error = 0.0
+  total_pixels = 0
+  with torch.no_grad():
+    for img, depth_gt in dataloader:
+      img = img.to(device)
+      depth_gt = depth_gt.to(device)
+      pred = model(img)
+      error = torch.abs(pred - depth_gt)
+      total_error += error.sum().item()
+      total_pixels += error.numel()
+  return total_error / total_pixels
 
 if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -68,13 +155,83 @@ if __name__ == "__main__":
     #################################################
     #################################################
     #################################################
+    transform = transforms.Compose([
+    transforms.Resize((224, 224)),
+    transforms.ToTensor(),
+    ])
+    
     dataset = StereoDepthKITTI(root_dir=root_dir, transform=transform)
     stereo_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True,  num_workers=num_workers, persistent_workers=True, pin_memory=True)
 
+    '''    
     for left, right, disp in stereo_loader:
         print(f"Left image shape     : {left.shape}")     # (B, 3, 224, 224)
         print(f"Right image shape    : {right.shape}")    # (B, 3, 224, 224)
         print(f"Disparity map shape  : {disp.shape}")     # (B, 1, 224, 224)
         break  # 첫 배치만 보고 종료
-
+    '''
     print(f"Number of Samples: {len(dataset)}")
+
+    model = StereoNet(192).to(device)
+    #################################################
+    #################### TO DO ######################
+    #################################################
+    """
+    Please fill in the following optimization components:
+    1. criterion : Loss function
+    2. optimizer : Optimizer
+    3. (optional) scheduler : Learning rate scheduler
+    Feel free to experiment with any configuration you prefer.
+    """
+    criterion = nn.MSELoss()
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
+    scheduler = None
+    #################################################
+    #################################################
+    #################################################
+    best_loss = float('inf')
+    #model_dir = '/content/drive/MyDrive/models'
+    model_dir = './models'
+    os.makedirs(model_dir, exist_ok=True)
+    save_path = os.path.join(model_dir, 'best_stereo_model.pth')
+    '''
+    #모델 학습
+    for epoch in range(1, num_epochs+1):
+        model.train()
+        total_loss = 0
+        t0 = time.time()
+
+        for l_img, r_img, gt_disp in stereo_loader:
+            l_img, r_img, gt_disp = l_img.to(device), r_img.to(device), gt_disp.to(device)
+
+            optimizer.zero_grad()
+            out = model(l_img, r_img)
+            pred = out.squeeze(1)
+            gt = gt_disp.squeeze(1)
+
+            mask = gt > 0
+            loss = criterion(pred[mask], gt[mask])
+
+            loss.backward()
+            optimizer.step()
+            total_loss += loss.item()
+
+        avg_loss = total_loss / len(stereo_loader)
+
+        # save on every epoch if it's the best so far
+        if avg_loss < best_loss:
+            best_loss = avg_loss
+            torch.save(model.state_dict(), save_path)
+            # print(f"[Epoch {epoch}] New best loss {best_loss:.4f}, model saved.")
+
+        # print progress every 10 epochs
+        if epoch % 10 == 0:
+            elapsed = time.time() - t0
+            print(f"Epoch {epoch}/{num_epochs} Loss: {avg_loss:.4f} Time: {elapsed:.1f}s")
+    '''
+    #best_path = os.path.join(model_dir, 'best_mono_model.pth')
+    best_path = os.path.join(model_dir, 'best_stereo_model.pth')
+    model.load_state_dict(torch.load(best_path, map_location=device))
+    model.to(device).eval()
+    val_mae = evaluate_model(model, mono_loader, device)
+    print(f"Validation MAE: {val_mae:.4f}")

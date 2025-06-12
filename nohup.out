@@ -1,0 +1,50 @@
+/Users/onjih8587/.pyenv/versions/3.10.12/lib/python3.10/site-packages/torch/utils/data/dataloader.py:683: UserWarning: 'pin_memory' argument is set as true but not supported on MPS now, then device pinned memory won't be used.
+  warnings.warn(warn_msg)
+left_images : 200
+right_images: 200
+disparity   : 200
+Number of Samples: 200
+Traceback (most recent call last):
+  File "/Users/onjih8587/Desktop/cvfinal2/cvfinal.py", line 198, in <module>
+    loss.backward()
+  File "/Users/onjih8587/.pyenv/versions/3.10.12/lib/python3.10/site-packages/torch/_tensor.py", line 648, in backward
+    torch.autograd.backward(
+  File "/Users/onjih8587/.pyenv/versions/3.10.12/lib/python3.10/site-packages/torch/autograd/__init__.py", line 353, in backward
+    _engine_run_backward(
+  File "/Users/onjih8587/.pyenv/versions/3.10.12/lib/python3.10/site-packages/torch/autograd/graph.py", line 824, in _engine_run_backward
+    return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+KeyboardInterrupt
+/Users/onjih8587/.pyenv/versions/3.10.12/lib/python3.10/site-packages/torch/utils/data/dataloader.py:683: UserWarning: 'pin_memory' argument is set as true but not supported on MPS now, then device pinned memory won't be used.
+  warnings.warn(warn_msg)
+left_images : 200
+right_images: 200
+disparity   : 200
+Number of Samples: 200
+/Users/onjih8587/.pyenv/versions/3.10.12/lib/python3.10/multiprocessing/resource_tracker.py:224: UserWarning: resource_tracker: There appear to be 14 leaked semaphore objects to clean up at shutdown
+  warnings.warn('resource_tracker: There appear to be %d '
+/Users/onjih8587/.pyenv/versions/3.10.12/lib/python3.10/site-packages/torch/utils/data/dataloader.py:683: UserWarning: 'pin_memory' argument is set as true but not supported on MPS now, then device pinned memory won't be used.
+  warnings.warn(warn_msg)
+left_images : 200
+right_images: 200
+disparity   : 200
+Number of Samples: 200
+Epoch 10/200 Loss: 4.2001 Time: 100.2s
+Epoch 20/200 Loss: 3.0592 Time: 99.2s
+Epoch 30/200 Loss: 2.6755 Time: 99.2s
+Epoch 40/200 Loss: 2.5625 Time: 106.4s
+Epoch 50/200 Loss: 2.3747 Time: 101.4s
+Epoch 60/200 Loss: 2.2880 Time: 100.0s
+Epoch 70/200 Loss: 2.2176 Time: 96.1s
+Epoch 80/200 Loss: 2.1126 Time: 97.6s
+Epoch 90/200 Loss: 2.1667 Time: 97.2s
+Epoch 100/200 Loss: 2.0838 Time: 96.7s
+Epoch 110/200 Loss: 1.9882 Time: 97.9s
+Epoch 120/200 Loss: 1.9481 Time: 99.0s
+Epoch 130/200 Loss: 1.9663 Time: 97.7s
+Epoch 140/200 Loss: 1.9253 Time: 97.2s
+Epoch 150/200 Loss: 1.9093 Time: 96.0s
+Epoch 160/200 Loss: 1.8420 Time: 95.8s
+Epoch 170/200 Loss: 1.9004 Time: 95.7s
+Epoch 180/200 Loss: 1.8309 Time: 95.4s
+Epoch 190/200 Loss: 1.8169 Time: 95.0s
+Epoch 200/200 Loss: 1.8092 Time: 95.2s
