@@ -264,11 +264,48 @@ if __name__ == "__main__":
     #best_path = os.path.join(model_dir, 'best_mono_model.pth')
     best_path = os.path.join(model_dir, 'best_stereo_model.pth')
 
-    save_disp_dir = os.path.join(root_dir, 'testing', 'pred_disp')
-    os.makedirs(save_disp_dir, exist_ok=True)
-
+    '''
+    #mae 계산
     model.load_state_dict(torch.load(best_path, map_location=device))
     model.to(device).eval()
 
     val_mae = calculate_mae(model, stereo_loader, device)
     print(f"Validation MAE: {val_mae:.4f}")
+    '''
+
+    model.load_state_dict(torch.load(best_model_path, map_location=device))
+    model.to(device).eval()
+
+    val_loader = DataLoader(dataset, batch_size=5, shuffle=False, num_workers=2, pin_memory=True)
+
+    l_imgs, r_imgs, gt_disps = next(iter(val_loader))
+    l_imgs, r_imgs, gt_disps = l_imgs.to(device), r_imgs.to(device), gt_disps.to(device)
+
+    with torch.no_grad():
+    preds = model(l_imgs, r_imgs)
+
+    fig, axes = plt.subplots(5, 3, figsize=(9, 15))
+    with torch.no_grad():
+      for i in range(5):
+        axes[i, 0].imshow(l_imgs[i].permute(1, 2, 0).cpu())
+        axes[i, 0].set_title("Input")
+        axes[i, 0].axis('off')
+
+        gt = gt_disps[i, 0].cpu().numpy()
+        lo_gt, hi_gt = np.percentile(gt, 5), np.percentile(gt, 95)
+        gt_clip = np.clip((gt - lo_gt) / (hi_gt - lo_gt + 1e-8), 0, 1)
+        gt_gamma = gt_clip ** 0.5
+        axes[i, 1].imshow(gt_gamma, cmap='magma')
+        axes[i, 1].set_title("GT Disparity")
+        axes[i, 1].axis('off')
+
+        pred = preds[i, 0].cpu().numpy()
+        lo_p, hi_p = np.percentile(pred, 5), np.percentile(pred, 95)
+        pred_clip = np.clip((pred - lo_p) / (hi_p - lo_p + 1e-8), 0, 1)
+        pred_gamma = pred_clip ** 0.5
+        axes[i, 2].imshow(pred_gamma, cmap='magma')
+        axes[i, 2].set_title("Pred Disparity")
+        axes[i, 2].axis('off')
+
+    plt.tight_layout()
+    plt.show()
