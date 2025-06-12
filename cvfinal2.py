@@ -198,3 +198,38 @@ if __name__ == "__main__":
     #################################################
     #################################################
     #################################################
+    model_dir = "models"
+    os.makedirs(model_dir, exist_ok=True)
+    save_path = os.path.join(model_dir, 'best_mono_model.pth')
+
+    step = 0
+    for epoch in range(1, num_epochs+1):
+        model.train()
+        total_loss = 0
+        t0 = time.time()
+
+        for img, gt_depth in mono_loader:
+            img, gt_depth = img.to(device), gt_depth.to(device)
+
+            optimizer.zero_grad()
+            pred = model(img).squeeze(1)
+            gt   = gt_depth.squeeze(1)
+
+            loss = criterion(pred, gt)
+            loss.backward()
+            optimizer.step()
+            scheduler.step()
+            step += 1
+
+            total_loss += loss.item()
+
+        avg_loss = total_loss / len(mono_loader)
+
+        if avg_loss < best_loss:
+            best_loss = avg_loss
+            torch.save(model.state_dict(), save_path)
+            # print(f"[Epoch {epoch}] New best loss {best_loss:.4f}, model saved.")
+
+        if epoch % 10 == 0:
+            elapsed = time.time() - t0
+            print(f"Epoch {epoch}/{num_epochs}  Loss: {avg_loss:.4f}  Time: {elapsed:.1f}s")
