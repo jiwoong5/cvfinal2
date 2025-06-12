@@ -312,3 +312,40 @@ if __name__ == "__main__":
     os.makedirs("output", exist_ok=True)
     plt.savefig("output/1_7.png")
     '''
+    '''
+    #testing 첫 5개 이미지에 대한 깊이맵 생성
+    model.load_state_dict(torch.load("models/best_stereo_model.pth", map_location=device))
+    model.to(device).eval()
+
+    test_dir = os.path.join(root_dir, 'testing', 'image_2')
+    all_files = [f for f in os.listdir(test_dir) if f.endswith('_10.png')]
+    all_files.sort()
+    test_files = all_files[:5]
+
+    fig, axes = plt.subplots(len(test_files), 2, figsize=(8, 4 * len(test_files)))
+
+    with torch.no_grad():
+      for i, fname in enumerate(test_files):
+        img_l = Image.open(os.path.join(root_dir, 'testing', 'image_2', fname)).convert('RGB')
+        img_r = Image.open(os.path.join(root_dir, 'testing', 'image_3', fname)).convert('RGB')
+        inp_l = transform(img_l).unsqueeze(0).to(device)
+        inp_r = transform(img_r).unsqueeze(0).to(device)
+
+        pred = model(inp_l, inp_r)[0, 0].cpu().numpy()
+
+        # percentile clipping (5–95%) and gamma correction (γ=0.5)
+        lo, hi = np.percentile(pred, 5), np.percentile(pred, 95)
+        pred_clip = np.clip((pred - lo) / (hi - lo + 1e-8), 0, 1)
+        pred_gamma = pred_clip ** 0.5
+
+        axes[i, 0].imshow(inp_l[0].cpu().permute(1, 2, 0).numpy())
+        axes[i, 0].set_title(f"Test Input ({fname})")
+        axes[i, 0].axis('off')
+
+        axes[i, 1].imshow(pred_gamma, cmap='magma')
+        axes[i, 1].set_title(f"Pred Disparity ({fname})")
+        axes[i, 1].axis('off')
+
+    plt.tight_layout()
+    plt.savefig("output/1_7_testing.png")
+    '''
