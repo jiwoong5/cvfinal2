@@ -267,6 +267,7 @@ if __name__ == "__main__":
             elapsed = time.time() - t0
             print(f"Epoch {epoch}/{num_epochs}  Loss: {avg_loss:.4f}  Time: {elapsed:.1f}s")
     '''
+    '''
     #모델 평가
     best_path = os.path.join(model_dir, 'best_mono_model.pth')
     model.load_state_dict(torch.load(best_path, map_location=device))
@@ -279,3 +280,48 @@ if __name__ == "__main__":
 
     val_mae = evaluate_model(model, mono_loader, device)
     print(f"Validation MAE: {val_mae:.4f}")
+    '''
+    #training set 이용 정답 깊이맵 추론 깊이맵 비교 시각화
+    best_mono_path = os.path.join(model_dir, 'best_mono_model.pth')
+    model.load_state_dict(torch.load(best_mono_path, map_location=device))
+    model.to(device).eval()
+
+    inv_norm = transforms.Normalize(
+    mean=[-m/s for m, s in zip([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])],
+    std=[1/s for s in [0.229, 0.224, 0.225]]
+    )
+
+    imgs, gt_depths = next(iter(mono_loader))
+    imgs, gt_depths = imgs.to(device), gt_depths.to(device)
+
+    model.eval()
+    with torch.no_grad():
+        preds = model(imgs)
+
+    fig, axes = plt.subplots(5, 3, figsize = (9, 15))
+    for i in range(5):
+        img_denorm = inv_norm(imgs[i].cpu())
+        img_vis = img_denorm.permute(1, 2, 0).numpy()
+        img_vis = np.clip(img_vis, 0, 1)
+        axes[i, 0].imshow(img_vis)
+        axes[i, 0].set_title("Input")
+        axes[i, 0].axis('off')
+
+        gt_np = gt_depths[i, 0].cpu().numpy()
+        lo_gt, hi_gt = np.percentile(gt_np, 5), np.percentile(gt_np, 95)
+        gt_clip = np.clip((gt_np - lo_gt) / (hi_gt - lo_gt + 1e-8), 0, 1)
+        gt_gamma = gt_clip ** 0.5
+        axes[i, 1].imshow(gt_gamma, cmap ='magma')
+        axes[i, 1].set_title("GT Depth")
+        axes[i, 1].axis('off')
+
+        pred_np = preds[i, 0].cpu().numpy()
+        lo_p, hi_p = np.percentile(pred_np, 5), np.percentile(pred_np, 95)
+        pred_clip = np.clip((pred_np - lo_p) / (hi_p - lo_p + 1e-8), 0, 1)
+        pred_gamma = pred_clip ** 0.5
+        axes[i, 2].imshow(pred_gamma, cmap='magma')
+        axes[i, 2].set_title("Pred Depth")
+        axes[i, 2].axis('off')
+
+    plt.tight_layout()
+    plt.savefig("output/2_6.png")
