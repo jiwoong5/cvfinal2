@@ -215,6 +215,7 @@ if __name__ == "__main__":
     os.makedirs(model_dir, exist_ok=True)
     save_path = os.path.join(model_dir, 'best_mono_model.pth')
 
+    '''
     step = 0
     best_loss = float('inf')
     for epoch in range(1, num_epochs+1):
@@ -247,3 +248,4 @@ if __name__ == "__main__":
         if epoch % 10 == 0:
             elapsed = time.time() - t0
             print(f"Epoch {epoch}/{num_epochs}  Loss: {avg_loss:.4f}  Time: {elapsed:.1f}s")
+    '''
