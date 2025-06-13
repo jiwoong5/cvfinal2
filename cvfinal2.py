@@ -164,6 +164,21 @@ class UNetDepth(nn.Module):
 
         return self.act(self.conv_last(d1))
     
+def evaluate_model(model, dataloader, device):
+  model.to(device)
+  model.eval()
+  total_error = 0.0
+  total_pixels = 0
+  with torch.no_grad():
+    for img, depth_gt in dataloader:
+      img = img.to(device)
+      depth_gt = depth_gt.to(device)
+      pred = model(img)
+      error = torch.abs(pred - depth_gt)
+      total_error += error.sum().item()
+      total_pixels += error.numel()
+  return total_error / total_pixels
+
 if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     device
@@ -211,11 +226,14 @@ if __name__ == "__main__":
     #################################################
     #################################################
     #################################################
+    
+    #모델학습
     model_dir = "models"
+    '''
     os.makedirs(model_dir, exist_ok=True)
     save_path = os.path.join(model_dir, 'best_mono_model.pth')
 
-    '''
+    
     step = 0
     best_loss = float('inf')
     for epoch in range(1, num_epochs+1):
@@ -249,3 +267,15 @@ if __name__ == "__main__":
             elapsed = time.time() - t0
             print(f"Epoch {epoch}/{num_epochs}  Loss: {avg_loss:.4f}  Time: {elapsed:.1f}s")
     '''
+    #모델 평가
+    best_path = os.path.join(model_dir, 'best_mono_model.pth')
+    model.load_state_dict(torch.load(best_path, map_location=device))
+    model.to(device).eval()
+
+    dataset = MonoDepthKITTI_Test(root_dir=root_dir, 
+                                transform_img=transform_img, 
+                                transform_disp=transform_disp)
+    mono_loader = DataLoader(dataset, batch_size=batch_size//2, shuffle=False, num_workers=num_workers, persistent_workers=True, pin_memory=True)
+
+    val_mae = evaluate_model(model, mono_loader, device)
+    print(f"Validation MAE: {val_mae:.4f}")
