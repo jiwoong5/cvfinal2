@@ -168,6 +168,30 @@ def calculate_mae(model, dataloader, device):
     mae = total_abs_error / total_pixels
     return mae
 
+def calculate_rmse(model, dataloader, device):
+    model.eval()
+    model.to(device)
+    total_squared_error = 0.0
+    total_pixels = 0
+    
+    with torch.no_grad():
+        for left_img, right_img, gt_disp in dataloader:
+            left_img = left_img.to(device)
+            right_img = right_img.to(device)
+            gt_disp = gt_disp.to(device)
+            
+            pred_disp = model(left_img, right_img)
+            pred_disp = pred_disp.squeeze(1)
+            gt_disp = gt_disp.squeeze(1)
+
+            mask = gt_disp > 0
+            squared_error = ((pred_disp[mask] - gt_disp[mask]) ** 2).sum()
+            total_squared_error += squared_error.item()
+            total_pixels += mask.sum().item()
+
+    rmse = (total_squared_error / total_pixels) ** 0.5
+    return rmse
+
 if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     device
@@ -264,14 +288,14 @@ if __name__ == "__main__":
     #best_path = os.path.join(model_dir, 'best_mono_model.pth')
     best_path = os.path.join(model_dir, 'best_stereo_model.pth')
 
-    '''
+    
     #mae 계산
     model.load_state_dict(torch.load(best_path, map_location=device))
     model.to(device).eval()
 
-    val_mae = calculate_mae(model, stereo_loader, device)
-    print(f"Validation MAE: {val_mae:.4f}")
-    '''
+    rmse_original = calculate_rmse(model, stereo_loader, device)
+    print(f"Original RMSE: {rmse_original:.4f}")
+    
     '''
     #training 첫 5개 이미지에 대한 깊이맵 생성 및 결과 비교
     model.load_state_dict(torch.load("models/best_stereo_model.pth", map_location=device))
