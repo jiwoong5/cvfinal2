@@ -257,34 +257,40 @@ def compare_models():
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, 
                            num_workers=num_workers, persistent_workers=True, pin_memory=True)
     
-    print(f"Total samples: {len(dataset)}")
-    print(f"Train samples: {len(train_dataset)}")
-    print(f"Validation samples: {len(val_dataset)}")
+    #print(f"Total samples: {len(dataset)}")
+    #print(f"Train samples: {len(train_dataset)}")
+    #print(f"Validation samples: {len(val_dataset)}")
     
     # 원본 모델 훈련
     original_model = StereoNet(192)
-    original_path = train_model(original_model, train_loader, device, num_epochs, "original")
+    #original_path = train_model(original_model, train_loader, device, num_epochs, "original")
     
     # 수정된 모델 훈련
     improved_model = ImprovedStereoNet(192)
-    improved_path = train_model(improved_model, train_loader, device, num_epochs, "improved")
+    #improved_path = train_model(improved_model, train_loader, device, num_epochs, "improved")
     
     # 모델 평가 및 비교
     print("\n=== Model Evaluation ===")
     
     # 원본 모델 평가
-    original_model.load_state_dict(torch.load(original_path, map_location=device))
+    original_model.load_state_dict(torch.load("./models/best_original_model.pth", map_location=device))
     original_rmse = calculate_rmse(original_model, val_loader, device)
     print(f"Original Model RMSE: {original_rmse:.4f}")
     
     # 수정된 모델 평가
-    improved_model.load_state_dict(torch.load(improved_path, map_location=device))
+    improved_model.load_state_dict(torch.load("./models/best_improved_model.pth", map_location=device))
     improved_rmse = calculate_rmse(improved_model, val_loader, device)
     print(f"Improved Model RMSE: {improved_rmse:.4f}")
     
+    improved_model.load_state_dict(torch.load("./models/best_stereo_model.pth", map_location=device))
+    improved_large_epoch_rmse = calculate_rmse(improved_model, val_loader, device)
+    print(f"Improved Model with Large Epoch RMSE: {improved_large_epoch_rmse:.4f}")
+
     # 결과 비교
-    improvement = ((original_rmse - improved_rmse) / original_rmse) * 100
-    print(f"\nRMSE Improvement: {improvement:.2f}%")
+    improvement1 = ((original_rmse - improved_rmse) / original_rmse) * 100
+    improvement2 = ((original_rmse - improved_large_epoch_rmse) / original_rmse) * 100
+    print(f"\noriginal -> improved model RMSE Improvement: {improvement1:.2f}%")
+    print(f"\noriginal -> imporved model with large epoch RMSE Improvement: {improvement2:.2f}%")
     
     if improved_rmse < original_rmse:
         print("✅ Improved model (with Residual Blocks) performs better!")
