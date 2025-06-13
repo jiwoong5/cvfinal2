@@ -281,6 +281,7 @@ if __name__ == "__main__":
     val_mae = evaluate_model(model, mono_loader, device)
     print(f"Validation MAE: {val_mae:.4f}")
     '''
+    '''
     #training set 이용 정답 깊이맵 추론 깊이맵 비교 시각화
     best_mono_path = os.path.join(model_dir, 'best_mono_model.pth')
     model.load_state_dict(torch.load(best_mono_path, map_location=device))
@@ -325,3 +326,47 @@ if __name__ == "__main__":
 
     plt.tight_layout()
     plt.savefig("output/2_6.png")
+    '''
+    '''
+    #testing set 이용 정답 깊이맵 추론 깊이맵 비교 시각화
+    best_mono_path = os.path.join(model_dir, 'best_mono_model.pth')
+    model.load_state_dict(torch.load(best_mono_path, map_location=device))
+    model.to(device).eval()
+
+    test_dir = os.path.join(root_dir, 'testing', 'image_2')
+    all_files = [f for f in os.listdir(test_dir) if f.endswith('_10.png')]
+    all_files.sort()
+    test_files = all_files[:5]
+
+    inv_norm = transforms.Normalize(
+        mean = [-m/s for m, s in zip([0.485,0.456,0.406], [0.229,0.224,0.225])],
+        std = [1/s for s in [0.229,0.224,0.225]]
+    )
+
+    fig, axes = plt.subplots(len(test_files), 2, figsize = (8, 4 * len(test_files)))
+
+    with torch.no_grad():
+        for i, fname in enumerate(test_files):
+            img_l = Image.open(os.path.join(test_dir, fname)).convert('RGB')
+            inp_l = transform_img(img_l).unsqueeze(0).to(device)
+
+            pred = model(inp_l)[0,0].cpu().numpy()
+            lo, hi = np.percentile(pred, 5), np.percentile(pred, 95)
+            pred_clip = np.clip((pred - lo) / (hi - lo + 1e-8), 0, 1)
+            pred_gamma = pred_clip ** 0.5
+
+            img_denorm = inv_norm(inp_l[0].cpu())
+            img_vis = img_denorm.permute(1,2,0).numpy()
+            img_vis = np.clip(img_vis, 0, 1)
+
+            axes[i,0].imshow(img_vis)
+            axes[i,0].set_title(f"Test Input ({fname})")
+            axes[i,0].axis('off')
+
+            axes[i,1].imshow(pred_gamma, cmap='magma')
+            axes[i,1].set_title(f"Pred Disparity ({fname})")
+            axes[i,1].axis('off')
+
+    plt.tight_layout()
+    plt.savefig("output/2_7.png")
+    '''
