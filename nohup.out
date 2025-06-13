@@ -48,3 +48,46 @@ Epoch 170/200 Loss: 1.9004 Time: 95.7s
 Epoch 180/200 Loss: 1.8309 Time: 95.4s
 Epoch 190/200 Loss: 1.8169 Time: 95.0s
 Epoch 200/200 Loss: 1.8092 Time: 95.2s
+/Users/onjih8587/.pyenv/versions/3.10.12/lib/python3.10/site-packages/torch/utils/data/dataloader.py:683: UserWarning: 'pin_memory' argument is set as true but not supported on MPS now, then device pinned memory won't be used.
+  warnings.warn(warn_msg)
+Number of Samples: 160
+Traceback (most recent call last):
+  File "/Users/onjih8587/Desktop/cvfinal2/cvfinal2.py", line 228, in <module>
+    if avg_loss < best_loss:
+NameError: name 'best_loss' is not defined
+/Users/onjih8587/.pyenv/versions/3.10.12/lib/python3.10/site-packages/torch/utils/data/dataloader.py:683: UserWarning: 'pin_memory' argument is set as true but not supported on MPS now, then device pinned memory won't be used.
+  warnings.warn(warn_msg)
+Number of Samples: 160
+/Users/onjih8587/.pyenv/versions/3.10.12/lib/python3.10/site-packages/torch/utils/data/dataloader.py:683: UserWarning: 'pin_memory' argument is set as true but not supported on MPS now, then device pinned memory won't be used.
+  warnings.warn(warn_msg)
+Number of Samples: 320
+Epoch 10/300  Loss: 0.0172  Time: 174.8s
+Epoch 20/300  Loss: 0.0170  Time: 169.0s
+Epoch 30/300  Loss: 0.0166  Time: 169.1s
+Epoch 40/300  Loss: 0.0165  Time: 174.0s
+Epoch 50/300  Loss: 0.0162  Time: 170.0s
+Epoch 60/300  Loss: 0.0161  Time: 177.1s
+Epoch 70/300  Loss: 0.0159  Time: 171.5s
+Epoch 80/300  Loss: 0.0160  Time: 165.9s
+Epoch 90/300  Loss: 0.0158  Time: 171.0s
+Epoch 100/300  Loss: 0.0157  Time: 164.4s
+Epoch 110/300  Loss: 0.0156  Time: 170.9s
+Epoch 120/300  Loss: 0.0155  Time: 173.0s
+Epoch 130/300  Loss: 0.0157  Time: 169.7s
+Epoch 140/300  Loss: 0.0154  Time: 174.8s
+Epoch 150/300  Loss: 0.0156  Time: 172.3s
+Epoch 160/300  Loss: 0.0153  Time: 173.1s
+Epoch 170/300  Loss: 0.0153  Time: 168.7s
+Epoch 180/300  Loss: 0.0154  Time: 169.9s
+Epoch 190/300  Loss: 0.0151  Time: 174.9s
+Epoch 200/300  Loss: 0.0152  Time: 171.6s
+Epoch 210/300  Loss: 0.0150  Time: 176.9s
+Epoch 220/300  Loss: 0.0150  Time: 172.8s
+Epoch 230/300  Loss: 0.0149  Time: 173.1s
+Epoch 240/300  Loss: 0.0149  Time: 204.0s
+Epoch 250/300  Loss: 0.0149  Time: 186.1s
+Epoch 260/300  Loss: 0.0149  Time: 181.4s
+Epoch 270/300  Loss: 0.0149  Time: 178.1s
+Epoch 280/300  Loss: 0.0148  Time: 171.9s
+Epoch 290/300  Loss: 0.0149  Time: 172.0s
+Epoch 300/300  Loss: 0.0147  Time: 169.1s

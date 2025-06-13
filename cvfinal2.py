@@ -16,48 +16,22 @@ class MonoDepthKITTI(Dataset):
   def __init__(self, root_dir, transform_img=None, transform_disp=None):
     super().__init__()
 
-    # 왼쪽 이미지와 대응하는 Non-Occluded 왼쪽 시차맵
+    # 왼쪽 이미지와 시차맵 (앞 160개)
     left_imgs = sorted(glob(os.path.join(root_dir, 'training/image_2/*_10.png')))[:160]
     left_disps = sorted(glob(os.path.join(root_dir, 'training/disp_noc_0/*_10.png')))[:160]
 
-    assert len(left_imgs) == len(left_disps), \
-        f"Images and disparity maps count mismatch: {len(left_imgs)} vs {len(left_disps)}"
-
-    self.img_paths = left_imgs
-    self.disp_paths = left_disps
-
-    self.transform_img  = transform_img
-    self.transform_disp = transform_disp
-
-  def __len__(self):
-    return len(self.img_paths)
-
-  def __getitem__(self, idx):
-    img = Image.open(self.img_paths[idx]).convert('RGB')
-    if self.transform_img:
-      img = self.transform_img(img)
-
-    raw = np.array(Image.open(self.disp_paths[idx]), dtype=np.uint16)
-    # depth in meters = raw / 256.0; normalize to [0,1] by /80.0
-    depth = torch.from_numpy(raw.astype(np.float32) / 256.0 / 80.0).unsqueeze(0)
-    if self.transform_disp:
-      depth = self.transform_disp(depth)
-
-    return img, depth
-
-class MonoDepthKITTI_Test(Dataset):
-  def __init__(self, root_dir, transform_img=None, transform_disp=None):
-    super().__init__()
-
-    # 왼쪽 이미지와 Non-Occluded 시차맵의 뒤쪽 40개
-    left_imgs = sorted(glob(os.path.join(root_dir, 'training/image_2/*_10.png')))[-40:]
-    left_disps = sorted(glob(os.path.join(root_dir, 'training/disp_noc_0/*_10.png')))[-40:]
+    # 오른쪽 이미지와 시차맵 (앞 160개)
+    right_imgs = sorted(glob(os.path.join(root_dir, 'training/image_3/*_10.png')))[:160]
+    right_disps = sorted(glob(os.path.join(root_dir, 'training/disp_noc_1/*_10.png')))[:160]
 
     assert len(left_imgs) == len(left_disps), \
-        f"Images and disparity maps count mismatch: {len(left_imgs)} vs {len(left_disps)}"
+        f"Left: {len(left_imgs)} imgs vs {len(left_disps)} disps"
+    assert len(right_imgs) == len(right_disps), \
+        f"Right: {len(right_imgs)} imgs vs {len(right_disps)} disps"
 
-    self.img_paths = left_imgs
-    self.disp_paths = left_disps
+    # 왼쪽 + 오른쪽 합치기
+    self.img_paths = left_imgs + right_imgs
+    self.disp_paths = left_disps + right_disps
 
     self.transform_img = transform_img
     self.transform_disp = transform_disp
@@ -71,12 +45,51 @@ class MonoDepthKITTI_Test(Dataset):
       img = self.transform_img(img)
 
     raw = np.array(Image.open(self.disp_paths[idx]), dtype=np.uint16)
-    # depth in meters = raw / 256.0; normalize to [0,1] by /80.0
     depth = torch.from_numpy(raw.astype(np.float32) / 256.0 / 80.0).unsqueeze(0)
     if self.transform_disp:
       depth = self.transform_disp(depth)
 
     return img, depth
+
+
+class MonoDepthKITTI_Test(Dataset):
+  def __init__(self, root_dir, transform_img=None, transform_disp=None):
+    super().__init__()
+
+    # 왼쪽 이미지와 시차맵 (뒤 40개)
+    left_imgs = sorted(glob(os.path.join(root_dir, 'training/image_2/*_10.png')))[-40:]
+    left_disps = sorted(glob(os.path.join(root_dir, 'training/disp_noc_0/*_10.png')))[-40:]
+
+    # 오른쪽 이미지와 시차맵 (뒤 40개)
+    right_imgs = sorted(glob(os.path.join(root_dir, 'training/image_3/*_10.png')))[-40:]
+    right_disps = sorted(glob(os.path.join(root_dir, 'training/disp_noc_1/*_10.png')))[-40:]
+
+    assert len(left_imgs) == len(left_disps), \
+        f"Left: {len(left_imgs)} imgs vs {len(left_disps)} disps"
+    assert len(right_imgs) == len(right_disps), \
+        f"Right: {len(right_imgs)} imgs vs {len(right_disps)} disps"
+
+    self.img_paths = left_imgs + right_imgs
+    self.disp_paths = left_disps + right_disps
+
+    self.transform_img = transform_img
+    self.transform_disp = transform_disp
+
+  def __len__(self):
+    return len(self.img_paths)
+
+  def __getitem__(self, idx):
+    img = Image.open(self.img_paths[idx]).convert('RGB')
+    if self.transform_img:
+      img = self.transform_img(img)
+
+    raw = np.array(Image.open(self.disp_paths[idx]), dtype=np.uint16)
+    depth = torch.from_numpy(raw.astype(np.float32) / 256.0 / 80.0).unsqueeze(0)
+    if self.transform_disp:
+      depth = self.transform_disp(depth)
+
+    return img, depth
+
 
   
 def transform_disp(depth_tensor):
@@ -203,6 +216,7 @@ if __name__ == "__main__":
     save_path = os.path.join(model_dir, 'best_mono_model.pth')
 
     step = 0
+    best_loss = float('inf')
     for epoch in range(1, num_epochs+1):
         model.train()
         total_loss = 0
