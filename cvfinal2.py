@@ -167,7 +167,7 @@ class UNetDepth(nn.Module):
 
 # UNet without Skip Connections
 class UNetDepth_NoSkip(nn.Module):
-    def __init__(self, in_channels=3, features=[64,128,256,512]):
+    def __init__(self, in_channels=3, features=[70, 140, 280, 560]):
         super().__init__()
         self.enc1 = self._conv_block(in_channels, features[0])
         self.pool1 = nn.MaxPool2d(2)
@@ -355,9 +355,12 @@ def compare_models_performance(model_paths, model_classes, test_loader, device):
             model.load_state_dict(torch.load(model_path, map_location=device))
             mae, rmse = evaluate_model_metrics(model, test_loader, device)
             results[model_name] = {'MAE': mae, 'RMSE': rmse}
+            total_params = sum(p.numel() for p in model.parameters())
+
             print(f"{model_name}:")
             print(f"  MAE:  {mae:.4f}")
             print(f"  RMSE: {rmse:.4f}")
+            print(f"전체 파라미터 수: {total_params:,}")
         except Exception as e:
             print(f"Error loading model {model_name}: {e}")
     
@@ -507,18 +510,18 @@ if __name__ == "__main__":
     
     # Define models to train
     models_to_train = [
-        (UNetDepth(), "original"),
+        #(UNetDepth(), "original"),
         (UNetDepth_NoSkip(), "noskip"),
-        (UNetDepth_BN(), "batch_norm")
+        #(UNetDepth_BN(), "batch_norm")
     ]
     
     # Uncomment to train models
     # Train all models
-    # trained_model_paths = []
-    # for model, model_name in models_to_train:
-    #     model = model.to(device)
-    #     model_path = train_model(model, model_name, train_loader, device, num_epochs)
-    #     trained_model_paths.append((model_path, type(model), model_name))
+    trained_model_paths = []
+    for model, model_name in models_to_train:
+        model = model.to(device)
+        model_path = train_model(model, model_name, train_loader, device, num_epochs)
+        trained_model_paths.append((model_path, type(model), model_name))
     
     # 모델 경로 직접 지정
     model_paths = [
