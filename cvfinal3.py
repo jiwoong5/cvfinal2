@@ -89,6 +89,95 @@ class DetectKITTI(Dataset):
       'orig_size': (orig_w, orig_h)
     }
 
+class ConvBlock(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size, stride, padding):
+        super().__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding, bias=False)
+        self.bn = nn.BatchNorm2d(out_channels)
+        self.act = nn.LeakyReLU(0.1, inplace=True)
+
+    def forward(self, x):
+        x = self.conv(x)
+        x = self.bn(x)
+        x = self.act(x)
+        return x
+    
+class ResidualBlock(nn.Module):
+    def __init__(self, channels):
+        super().__init__()
+        self.conv1 = ConvBlock(channels, channels, 3, 1, 1)
+        self.conv2 = ConvBlock(channels, channels, 3, 1, 1)
+    def forward(self, x):
+        return x + self.conv2(self.conv1(x))
+
+class ConvBlock(nn.Module):
+    def __init__(self, in_c, out_c, k, s, p):
+        super().__init__()
+        self.conv = nn.Conv2d(in_c, out_c, k, s, p, bias=False)
+        self.bn   = nn.BatchNorm2d(out_c)
+        self.act  = nn.LeakyReLU(0.1, inplace=True)
+
+    def forward(self, x):
+        return self.act(self.bn(self.conv(x)))
+
+class YOLOv4Tiny(nn.Module):
+    def __init__(self, num_classes=8):
+        super().__init__()
+        self.num_classes = num_classes
+
+        # Backbone: 특징 맵 3개 추출 (저해상도 → 고해상도)
+        self.backbone = nn.Sequential(
+            ConvBlock(3,  16, 3,1,1), nn.MaxPool2d(2,2),
+            ConvBlock(16, 32, 3,1,1), nn.MaxPool2d(2,2),
+            ConvBlock(32, 64, 3,1,1), nn.MaxPool2d(2,2),
+            ConvBlock(64,128, 3,1,1), nn.MaxPool2d(2,2),
+            ConvBlock(128,256,3,1,1), nn.MaxPool2d(2,2),
+            ConvBlock(256,512,3,1,1)
+        )
+
+        # 세 개의 특징 맵을 추출할 레이어 인덱스 예: 256, 512, 128 해상도 레벨
+        self.layer1 = nn.Sequential(*list(self.backbone.children())[:10])  # low level (high res)
+        self.layer2 = nn.Sequential(*list(self.backbone.children())[10:12]) # mid level
+        self.layer3 = nn.Sequential(*list(self.backbone.children())[12:])   # high level (low res)
+
+        # FPN lateral convs
+        self.lateral3 = ConvBlock(512, 256, 1, 1, 0)
+        self.lateral2 = ConvBlock(256, 256, 1, 1, 0)
+        self.lateral1 = ConvBlock(128, 256, 1, 1, 0)
+
+        # FPN output convs
+        self.smooth2 = ConvBlock(256, 256, 3, 1, 1)
+        self.smooth1 = ConvBlock(256, 256, 3, 1, 1)
+
+        # Prediction heads
+        self.pred3 = nn.Conv2d(256, (num_classes + 5) * 3, 1, 1, 0)
+        self.pred2 = nn.Conv2d(256, (num_classes + 5) * 3, 1, 1, 0)
+        self.pred1 = nn.Conv2d(256, (num_classes + 5) * 3, 1, 1, 0)
+
+        self.upsample = nn.Upsample(scale_factor=2, mode='nearest')
+
+    def forward(self, x):
+        # Backbone 특징 추출
+        c1 = self.layer1(x)  # high-res, low-level features
+        c2 = self.layer2(c1) # mid-level features
+        c3 = self.layer3(c2) # low-res, high-level features
+
+        # lateral conv
+        p3 = self.lateral3(c3)
+        p2 = self.lateral2(c2) + self.upsample(p3)
+        p1 = self.lateral1(c1) + self.upsample(p2)
+
+        # smooth conv
+        p2 = self.smooth2(p2)
+        p1 = self.smooth1(p1)
+
+        # prediction
+        out3 = self.pred3(p3)
+        out2 = self.pred2(p2)
+        out1 = self.pred1(p1)
+
+        return out1, out2, out3
+
 def yolo_loss(out1, out2, targets):
  losses = {'xy': 0, 'wh': 0, 'obj': 0, 'cls': 0}
  for i, pred in enumerate([out1, out2]):
@@ -224,6 +313,8 @@ if __name__ == "__main__":
     plt.tight_layout()
     plt.savefig('./output/3_1.png')
     '''
+    '''
+    #3_2 load data
     # anchors for two scales
     anchors_big   = [(116, 90), (156, 198), (373, 326)]
     anchors_small = [(30, 61),  (62, 45),   (59, 119)]
@@ -262,3 +353,6 @@ if __name__ == "__main__":
         plt.text(bar.get_x() + bar.get_width() / 2, height + 5, str(int(height)), ha='center')
     plt.tight_layout()
     plt.show()
+    '''
+    #3-3. build model
+    model = YOLOv4Tiny(num_classes=len(KITTI_CLASSES)).to(device)  # instantiate model
