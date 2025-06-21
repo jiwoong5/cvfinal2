@@ -1,0 +1,18 @@
+{
+  "pretrained_map": 0.0,
+  "biased_map": 0.0,
+  "balanced_map": 0.0,
+  "improvement_biased": 0.0,
+  "improvement_balanced": 0.0,
+  "num_classes": 8,
+  "classes": [
+    "Car",
+    "Van",
+    "Truck",
+    "Pedestrian",
+    "Person_sitting",
+    "Cyclist",
+    "Tram",
+    "Misc"
+  ]
+}
