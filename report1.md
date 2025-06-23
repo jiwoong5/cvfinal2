@@ -77,11 +77,40 @@ class ResidualBlock(nn.Module):
 | 3         | 개선된 Feature Extractor | 200              |
 
 ## 5. 실험 결과
-정량적 비교
+### 1. 정량적 비교
 ![1_5](https://github.com/jiwoong5/cvfinal2/blob/main/1_5.png)
 | 모델                        | RMSE    | 기존 모델 대비 개선율(%)        |
 |-----------------------------|---------|-------------------------------|
 | Original (기본 Feature, 20 epoch)     | 1.9388  | -                             |
 | Improved (개선된 Feature, 20 epoch)   | 1.7450  | 약 10.0% 개선                  |
 | Improved (개선된 Feature, 200 epoch)  | 1.3569  | 약 30.02% 개선                  |
-정성적 비교
+
+### 2. 정성적 비교
+
+<img src="https://github.com/jiwoong5/cvfinal2/blob/main/1_7_testing.png" width="800" height="600" />
+
+- 학습에 이용되지 않은 testing set 을 이용한 시각화
+- 기본 모델의 경우 좁은 영역을 깊게 예측하고, 개선 모델의 경우 넓은 영역을 덜 깊게 예측
+
+<img src="https://github.com/jiwoong5/cvfinal2/blob/main/1_7_training.png" width="800" height="600" />
+
+- 학습에 이용된 training set 을 이용한 시각화
+- gt와의 밝기 비교를 통해 전반적으로 개선된 모델이 좋은 성능을 낸다는 것을 알 수 있음
+
+## 6. 결론 및 향후 과제
+
+결과 요약:
+- 본 실험에서는 기본 StereoNet 구조와 비교하여, Residual Block을 도입한 ImprovedStereoNet이 정량적(RMSE 감소) 및 정성적(오차 시각화) 측면에서 확실한 성능 개선을 이끌어내는 것을 확인하였다. 
+- 특히, 장기 학습(200 epoch)을 통해 기존 대비 30% 이상의 RMSE 개선을 달성하며, 개선된 Feature Extractor의 학습 효율성과 일반화 능력을 입증하였다.
+
+한계점:
+- 실험에 사용된 네트워크 구조는 여전히 간단한 CNN 기반으로, 복잡한 장면이나 얇은 구조물에 대한 정밀한 깊이 추정은 어렵다.
+- Cost Volume Aggregation 또한 정교한 정규화나 attention 메커니즘을 활용하지 않았다.
+
+향후 연구 방향:
+- 보다 정교한 feature extractor 설계 (예: attention-based feature, multi-scale feature fusion 등).
+- 3D Convolution 기반의 cost volume regularization 구조로 확장.
+- 모델 경량화를 통한 실시간 응용 가능성 평가.
+
+결론:
+- 본 실험은 Residual 구조의 도입이 깊이 추정 모델의 안정성과 성능에 실질적인 영향을 준다는 점을 실증적으로 보여주며, 향후 Stereo Vision 기반 응용에서 효과적인 Feature Extractor 설계의 중요성을 부각시킨다.
