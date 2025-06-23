@@ -77,8 +77,11 @@ class ResidualBlock(nn.Module):
 | 3         | 개선된 Feature Extractor | 200              |
 
 ## 5. 실험 결과
+정량적 비교
+![1_5](https://github.com/jiwoong5/cvfinal2/blob/main/1_5.png)
 | 모델                        | RMSE    | 기존 모델 대비 개선율(%)        |
 |-----------------------------|---------|-------------------------------|
 | Original (기본 Feature, 20 epoch)     | 1.9388  | -                             |
 | Improved (개선된 Feature, 20 epoch)   | 1.7450  | 약 10.0% 개선                  |
 | Improved (개선된 Feature, 200 epoch)  | 1.3569  | 약 30.02% 개선                  |
+정성적 비교
