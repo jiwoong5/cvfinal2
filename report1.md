@@ -97,6 +97,10 @@ class ResidualBlock(nn.Module):
 - 학습에 이용된 training set 을 이용한 시각화
 - gt와의 밝기 비교를 통해 전반적으로 개선된 모델이 좋은 성능을 낸다는 것을 알 수 있음
 
+### 3. 최종비교
+
+<img src="https://github.com/jiwoong5/cvfinal2/blob/main/1_7_comparison.png" width="800" height="600" />
+
 ## 6. 결론 및 향후 과제
 
 결과 요약:
