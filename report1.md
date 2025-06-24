@@ -106,7 +106,6 @@ Gradient Vanishing 문제 원인 분석
 - 매우 깊은 네트워크(예: ResNet-152)도 안정적으로 학습 가능
 - 기존 네트워크보다 빠른 수렴 속도와 높은 정확도 달성
 
-## 4. 모델 아키텍쳐 소개
 ResidualBlock 구현
 ```
 python
