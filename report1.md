@@ -58,7 +58,6 @@ Gradient Vanishing 문제 원인 분석
 
  좌우 feature 차이 계산: CostVolume2DAggregation
  ```
- python
  class CostVolume2DAggregation(nn.Module):
   def __init__(self, max_disp=192):
     super().__init__()
@@ -108,7 +107,6 @@ Gradient Vanishing 문제 원인 분석
 
 ResidualBlock 구현
 ```
-python
 class ResidualBlock(nn.Module):
     def __init__(self, in_ch, out_ch, stride=1):
         ...
