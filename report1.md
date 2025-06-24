@@ -105,12 +105,12 @@ class ResidualBlock(nn.Module):
 ## 6. 결론 및 향후 과제
 
 결과 요약:
-- 본 실험에서는 기본 StereoNet 구조와 비교하여, Residual Block을 도입한 ImprovedStereoNet이 정량적(RMSE 감소) 및 정성적(오차 시각화) 측면에서 확실한 성능 개선을 이끌어내는 것을 확인하였다. 
-- 특히, 장기 학습(200 epoch)을 통해 기존 대비 30% 이상의 RMSE 개선을 달성하며, 개선된 Feature Extractor의 학습 효율성과 일반화 능력을 입증하였다.
+- 본 실험에서는 기본 StereoNet 구조와 비교하여, Residual Block을 도입한 ImprovedStereoNet이 정량적(RMSE 감소) 및 정성적(오차 시각화) 측면에서 확실한 성능 개선을 이끌어내는 것을 확인. 
+- 특히, 장기 학습(200 epoch)을 통해 기존 대비 30% 이상의 RMSE 개선을 달성하며, 개선된 Feature Extractor의 학습 효율성과 일반화 능력을 입증.
 
 한계점:
-- 실험에 사용된 네트워크 구조는 여전히 간단한 CNN 기반으로, 복잡한 장면이나 얇은 구조물에 대한 정밀한 깊이 추정은 어렵다.
-- Cost Volume Aggregation 또한 정교한 정규화나 attention 메커니즘을 활용하지 않았다.
+- 실험에 사용된 네트워크 구조는 여전히 간단한 CNN 기반으로, 복잡한 장면이나 얇은 구조물에 대한 정밀한 깊이 추정x.
+- Cost Volume Aggregation 또한 정교한 정규화나 attention 메커니즘을 활용 x.
 
 향후 연구 방향:
 - 보다 정교한 feature extractor 설계 (예: attention-based feature, multi-scale feature fusion 등).
