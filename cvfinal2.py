@@ -507,7 +507,7 @@ if __name__ == "__main__":
     #################################################
     ############### MODEL TRAINING ##################
     #################################################
-    
+    '''
     # Define models to train
     models_to_train = [
         #(UNetDepth(), "original"),
@@ -522,7 +522,7 @@ if __name__ == "__main__":
         model = model.to(device)
         model_path = train_model(model, model_name, train_loader, device, num_epochs)
         trained_model_paths.append((model_path, type(model), model_name))
-    
+    '''
     # 모델 경로 직접 지정
     model_paths = [
         "./models/best_mono_original_model.pth",
