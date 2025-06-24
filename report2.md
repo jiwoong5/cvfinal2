@@ -45,8 +45,6 @@ Batch Normalization 이란?
 - 한 배치(batch)에 속한 샘플들의 통계(평균, 분산)를 이용해 그 배치 내 데이터를 정규화
 - 학습 중 배치별 통계로 정규화를 하고, 추론 시에는 학습 전체에서 축적한 평균과 분산의 이동평균(running mean & variance) 을 사용하여 고정된 분포로 정규화를 수행
 
----
-
 ## 3. 실험 조건
 
 실험 조건
@@ -65,7 +63,6 @@ feature
   
 컨볼루션 블록
 ```
-python
 def _conv_block(self, in_ch, out_ch):
     return nn.Sequential(
         nn.Conv2d(in_ch, out_ch, 3, padding=1),
@@ -81,7 +78,6 @@ def _conv_block(self, in_ch, out_ch):
 
 UNET forward 구조
 ```
-python
 def forward(self, x):
       e1 = self.enc1(x)               # [B, 64, H, W]
       e2 = self.enc2(self.pool1(e1))  # [B, 128, H/2, W/2]
@@ -114,7 +110,6 @@ def forward(self, x):
 - enc4: 512 채널 출력
 - bottlenect: 512 채널 출력
 - 채널 수 변화: 3 → 64 → 128 → 256 → 512 → 1024 → 512 → 256 → 128 → 64 → 1
----
 
 ## 4. 주요 모델 구조 설명
 공통 구조 개요
@@ -139,7 +134,6 @@ nn.ReLU()
 ```
 - Convolution 후 BN → 비선형 활성화
 - 각 단계마다 출력값 분포 정규화 → 그래디언트 흐름 원활
----
 
 ## 4. 실험 결과
 
@@ -157,15 +151,11 @@ nn.ReLU()
 - NoSkip 모델은 세밀한 깊이 정보 손실이 관찰됨  
 - BatchNorm 모델은 학습 안정성과 세밀한 깊이 복원이 우수함
 
----
-
 ## 5. 분석 및 고찰
 
 - **Skip Connection**: 깊이 추정에서 중요한 공간 정보가 네트워크 깊은 층까지 전달되는 역할을 하므로, 제거 시 정보 손실이 발생해 성능 저하를 유발  
 - **Batch Normalization**: 각 층의 입력 분포를 정규화하여 학습 안정성 및 수렴 속도를 개선하며, 깊은 네트워크에서 과적합 감소 효과 기대  
 - **에포크 증가**: BatchNorm 모델에서 200 에포크로 장기 학습 시 RMSE가 크게 감소하여 학습 안정성과 표현력 향상을 확인  
-
----
 
 ## 6. 결론 및 향후 연구
 
