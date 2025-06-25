@@ -149,7 +149,7 @@ class KITTIBoxAnalyzer:
                     x1, y1, x2, y2 = det['bbox']
                     width = x2 - x1
                     height = y2 - y1
-                    
+
                     box_info = {
                         'class_name': det['class_name'],
                         'class_id': det['class_id'],
@@ -352,8 +352,8 @@ class KITTIBoxAnalyzer:
         
         # 박스 크기 vs 현재 앵커 비교
         current_anchors = [
-            [10, 13], [16, 30], [33, 23],  # P4
-            [30, 61], [62, 45], [59, 119]  # P5
+            [40, 32], [228, 122], [107, 83],  # P4
+            [395, 187], [300, 193], [354, 348]  # P5
         ]
         
         # 앵커를 이미지 크기에 맞게 스케일링 (stride 고려)
@@ -498,7 +498,7 @@ def run_complete_analysis(model_path, kitti_label_dir, kitti_image_dir, num_imag
 # 사용 예시
 if __name__ == "__main__":
     # 설정
-    MODEL_PATH = "yolov4_tiny_best.pth"
+    MODEL_PATH = "./yolov4_tiny_epoch_30.pth"
     KITTI_LABEL_DIR = "../training/label_2"
     KITTI_IMAGE_DIR = "../data_object_image_2/training/image_2"
     
@@ -507,5 +507,5 @@ if __name__ == "__main__":
         model_path=MODEL_PATH,
         kitti_label_dir=KITTI_LABEL_DIR,
         kitti_image_dir=KITTI_IMAGE_DIR,
-        num_images=100
+        num_images=10
     )

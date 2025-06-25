@@ -474,7 +474,7 @@ def test_multiple_images(model_path, image_dir, output_dir="results", conf_thres
 # 사용 예시
 if __name__ == "__main__":
     # 설정
-    MODEL_PATH = "yolov4_tiny_best.pth"  # 또는 "yolov4_tiny_epoch_30.pth"
+    MODEL_PATH = "./yolov4_tiny_epoch_30.pth"  # 또는 "yolov4_tiny_epoch_30.pth"
     
     # 여러 이미지 테스트 (선택사항)
     TEST_IMAGE_DIR = "../data_object_image_2/training/image_2"  # 테스트할 이미지 디렉토리

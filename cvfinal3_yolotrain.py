@@ -50,13 +50,13 @@ class YOLOv4Tiny(nn.Module):
         
         if anchors is None:
             # KITTI 데이터셋에 최적화된 앵커 (가로가 더 긴 형태)
-            if self.img_size[1] > self.img_size[0]:  # width > height (KITTI case)
+            if self.img_size[1] > self.img_size[0]:
                 self.anchors = [
-                    [[10, 13], [16, 30], [33, 23]],  # P4 - 작은 객체용, 스케일 수정
-                    [[30, 61], [62, 45], [59, 119]]  # P5 - 큰 객체용, 스케일 수정
+                    [[40, 32], [228, 122], [107, 83]],  # P4
+                    [[395, 187], [300, 193], [354, 348]]  # P5
                 ]
             else:
-                # 정사각형 이미지용 기본 앵커
+                # 정사각형 이미지용 기본 앵커 (필요시 유지)
                 self.anchors = [
                     [[10, 14], [23, 27], [37, 58]],  # P4
                     [[81, 82], [135, 169], [344, 319]]  # P5
