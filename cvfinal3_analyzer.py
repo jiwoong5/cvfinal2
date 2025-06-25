@@ -458,7 +458,7 @@ class KITTIBoxAnalyzer:
 
 def run_complete_analysis(model_path, kitti_label_dir, kitti_image_dir, num_images=10):
     """완전한 분석 실행"""
-    from cvfinal3_yolotraintest import YOLODetector  # 실제 detector import 경로로 수정
+    from cvfinal3_yolotrain import YOLODetector  # 실제 detector import 경로로 수정
     
     # 검출기 초기화
     detector = YOLODetector(

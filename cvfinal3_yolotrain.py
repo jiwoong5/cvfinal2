@@ -129,6 +129,253 @@ class YOLOv4Tiny(nn.Module):
         
         return out1, out2
 
+class YOLODetector:
+    def __init__(self, model_path, num_classes=8, img_size=(384, 1280), device='cuda'):
+        self.num_classes = num_classes
+        self.img_size = img_size
+        self.device = device
+        
+        # KITTI 클래스 이름
+        self.class_names = [
+            'Car', 'Van', 'Truck', 'Pedestrian', 
+            'Person_sitting', 'Cyclist', 'Tram', 'Misc'
+        ]
+        
+        # 클래스별 색상 (BGR)
+        self.colors = [
+            (255, 0, 0),    # Car - Red
+            (0, 255, 0),    # Van - Green
+            (0, 0, 255),    # Truck - Blue
+            (255, 255, 0),  # Pedestrian - Cyan
+            (255, 0, 255),  # Person_sitting - Magenta
+            (0, 255, 255),  # Cyclist - Yellow
+            (128, 0, 128),  # Tram - Purple
+            (255, 165, 0)   # Misc - Orange
+        ]
+        
+        # 모델 로드
+        self.model = self.load_model(model_path)
+        
+    def load_model(self, model_path):
+        """학습된 모델 로드"""
+        print(f"Loading model from {model_path}")
+        
+        # 모델 생성
+        model = YOLOv4Tiny(num_classes=self.num_classes, img_size=self.img_size)
+        
+        # 체크포인트 로드
+        if os.path.exists(model_path):
+            checkpoint = torch.load(model_path, map_location=self.device)
+            model.load_state_dict(checkpoint['model_state_dict'])
+            print(f"Model loaded successfully from epoch {checkpoint.get('epoch', 'unknown')}")
+            if 'train_loss' in checkpoint:
+                print(f"Training loss: {checkpoint['train_loss']:.4f}")
+            if 'val_loss' in checkpoint:
+                print(f"Validation loss: {checkpoint['val_loss']:.4f}")
+        else:
+            print(f"Warning: Model file not found at {model_path}")
+            print("Using randomly initialized model")
+        
+        model.to(self.device)
+        model.eval()
+        return model
+    
+    def preprocess_image(self, image_path):
+        """이미지 전처리"""
+        # 이미지 로드
+        img = cv2.imread(image_path)
+        if img is None:
+            raise ValueError(f"Could not load image from {image_path}")
+        
+        original_img = img.copy()
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        original_h, original_w = img.shape[:2]
+        
+        # 리사이즈
+        img_resized = cv2.resize(img, (self.img_size[1], self.img_size[0]))
+        img_tensor = torch.from_numpy(img_resized.astype(np.float32) / 255.0)
+        img_tensor = img_tensor.permute(2, 0, 1).unsqueeze(0).to(self.device)
+        
+        return img_tensor, original_img, (original_w, original_h)
+    
+    def postprocess_predictions(self, predictions, original_size, conf_thresh=0.5, nms_thresh=0.4):
+        """예측 결과 후처리"""
+        original_w, original_h = original_size
+        detections = []
+        
+        for i, pred in enumerate(predictions):
+            batch_size, _, grid_h, grid_w = pred.shape
+            num_anchors = len(self.model.anchors[i])
+            
+            # 예측 결과 reshape
+            pred = pred.view(batch_size, num_anchors, 5 + self.num_classes, grid_h, grid_w)
+            pred = pred.permute(0, 1, 3, 4, 2).contiguous()
+            pred = pred.view(-1, 5 + self.num_classes)
+            
+            # 시그모이드 적용
+            pred[..., 0:2] = torch.sigmoid(pred[..., 0:2])  # x, y
+            pred[..., 4] = torch.sigmoid(pred[..., 4])      # objectness
+            if self.num_classes > 1:
+                pred[..., 5:] = torch.sigmoid(pred[..., 5:])    # class probs
+            
+            # 좌표 변환
+            stride_h = self.img_size[0] / grid_h
+            stride_w = self.img_size[1] / grid_w
+            
+            for anchor_idx in range(num_anchors):
+                for j in range(grid_h):
+                    for k in range(grid_w):
+                        idx = anchor_idx * grid_h * grid_w + j * grid_w + k
+                        
+                        # Objectness score
+                        obj_score = pred[idx, 4].item()
+                        if obj_score < conf_thresh:
+                            continue
+                        
+                        # 좌표 계산
+                        x_offset = pred[idx, 0].item()
+                        y_offset = pred[idx, 1].item()
+                        w_pred = pred[idx, 2].item()
+                        h_pred = pred[idx, 3].item()
+                        
+                        # 절대 좌표 계산
+                        center_x = (k + x_offset) * stride_w
+                        center_y = (j + y_offset) * stride_h
+                        
+                        # 앵커 크기
+                        anchor_w = self.model.anchors[i][anchor_idx][0]
+                        anchor_h = self.model.anchors[i][anchor_idx][1]
+                        
+                        # 실제 크기 계산
+                        width = anchor_w * np.exp(w_pred)
+                        height = anchor_h * np.exp(h_pred)
+                        
+                        # 원본 이미지 좌표로 변환
+                        x1 = (center_x - width / 2) * original_w / self.img_size[1]
+                        y1 = (center_y - height / 2) * original_h / self.img_size[0]
+                        x2 = (center_x + width / 2) * original_w / self.img_size[1]
+                        y2 = (center_y + height / 2) * original_h / self.img_size[0]
+                        
+                        # 클래스 예측
+                        if self.num_classes == 1:
+                            class_id = 0
+                            class_score = obj_score
+                        else:
+                            class_scores = pred[idx, 5:].cpu().numpy()
+                            class_id = np.argmax(class_scores)
+                            class_score = obj_score * class_scores[class_id]
+                        
+                        if class_score >= conf_thresh:
+                            detections.append({
+                                'bbox': [x1, y1, x2, y2],
+                                'score': class_score,
+                                'class_id': class_id,
+                                'class_name': self.class_names[class_id] if class_id < len(self.class_names) else f'Class_{class_id}'
+                            })
+        
+        print(f"후보 박스 수 (conf 적용 후): {len(detections)}")
+
+        # NMS 적용
+        if len(detections) > 0:
+            detections = self.non_max_suppression(detections, nms_thresh)
+        
+        return detections
+    
+    def non_max_suppression(self, detections, nms_thresh):
+        """Non-Maximum Suppression"""
+        if len(detections) == 0:
+            return []
+        
+        # 신뢰도 기준 정렬
+        detections = sorted(detections, key=lambda x: x['score'], reverse=True)
+        
+        keep = []
+        while len(detections) > 0:
+            keep.append(detections[0])
+            remaining = []
+            
+            for det in detections[1:]:
+                iou = self.calculate_iou(keep[-1]['bbox'], det['bbox'])
+                if iou < nms_thresh:
+                    remaining.append(det)
+            
+            detections = remaining
+        
+        return keep
+    
+    def calculate_iou(self, box1, box2):
+        """IoU 계산"""
+        x1_1, y1_1, x2_1, y2_1 = box1
+        x1_2, y1_2, x2_2, y2_2 = box2
+        
+        # 교집합 영역 계산
+        x1_inter = max(x1_1, x1_2)
+        y1_inter = max(y1_1, y1_2)
+        x2_inter = min(x2_1, x2_2)
+        y2_inter = min(y2_1, y2_2)
+        
+        if x2_inter <= x1_inter or y2_inter <= y1_inter:
+            return 0.0
+        
+        inter_area = (x2_inter - x1_inter) * (y2_inter - y1_inter)
+        
+        # 합집합 영역 계산
+        area1 = (x2_1 - x1_1) * (y2_1 - y1_1)
+        area2 = (x2_2 - x1_2) * (y2_2 - y1_2)
+        union_area = area1 + area2 - inter_area
+        
+        return inter_area / union_area if union_area > 0 else 0.0
+    
+    def detect(self, image_path, conf_thresh=0.5, nms_thresh=0.4):
+        """객체 검출 수행"""
+        # 이미지 전처리
+        img_tensor, original_img, original_size = self.preprocess_image(image_path)
+        
+        # 예측 수행
+        with torch.no_grad():
+            predictions = self.model(img_tensor)
+
+        # 후처리
+        detections = self.postprocess_predictions(predictions, original_size, conf_thresh, nms_thresh)
+        
+        return detections, original_img
+    
+    def visualize_detections(self, image, detections, save_path=None, show=True):
+        """검출 결과 시각화"""
+        img_vis = image.copy()
+        
+        for det in detections:
+            x1, y1, x2, y2 = [int(coord) for coord in det['bbox']]
+            score = det['score']
+            class_name = det['class_name']
+            class_id = det['class_id']
+            
+            # 바운딩 박스 그리기
+            color = self.colors[class_id % len(self.colors)]
+            cv2.rectangle(img_vis, (x1, y1), (x2, y2), color, 2)
+            
+            # 라벨 그리기
+            label = f"{class_name}: {score:.2f}"
+            label_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)[0]
+            cv2.rectangle(img_vis, (x1, y1 - label_size[1] - 10), 
+                         (x1 + label_size[0], y1), color, -1)
+            cv2.putText(img_vis, label, (x1, y1 - 5), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+        
+        if save_path:
+            cv2.imwrite(save_path, img_vis)
+            print(f"Result saved to {save_path}")
+        
+        if show:
+            plt.figure(figsize=(15, 10))
+            plt.imshow(cv2.cvtColor(img_vis, cv2.COLOR_BGR2RGB))
+            plt.title(f'YOLOv4 Tiny Detection Results ({len(detections)} objects)')
+            plt.axis('off')
+            plt.tight_layout()
+            plt.show()
+        
+        return img_vis
+
 class YOLOLoss(nn.Module):
     def __init__(self, anchors, num_classes, img_size=416):
         super(YOLOLoss, self).__init__()
