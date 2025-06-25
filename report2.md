@@ -5,10 +5,10 @@ UNetDepth란?
 - UNetDepth는 UNet 구조를 기반으로 한 단안 깊이 추정 모델로, 입력 이미지에서 픽셀 단위 깊이 맵을 예측
 - UNet은 인코더-디코더 구조를 갖추고 있으며, 인코더는 특징 추출, 디코더는 해상도 복원을 담당
 - 깊이 추정에 적합하도록 설계된 UNetDepth는 공간 정보를 효과적으로 활용하여 정확한 깊이 맵 생성이 가능
+- skip connection 구조: low-level 정보를 later stage까지 직접 전달해서 보완하는 잔차구조
 
 기본 UNetDepth 구조의 문제점
 - 단순 인코더-디코더 연결만으로는 저수준 공간 정보가 깊이 맵 복원에 충분히 반영되지 않을 수 있음
-- 네트워크가 깊어질수록 역전파 시 기울기 소실(Gradient Vanishing) 문제로 학습이 어려워질 수 있음
 - 배치 간 **통계 변동**으로 인한 학습 불안정성 문제가 존재할 수 있음
 
 Batch 간 통계 변동이란?
@@ -56,84 +56,127 @@ Batch Normalization 이란?
 - 이미지 크기: 224 x 224로 리사이즈
 - 텐서 변환
 - 정규화 (평균: [0.485, 0.456, 0.406], 표준편차: [0.229, 0.224, 0.225])
-
-feature
-- [64,128,256,512]
-
   
-컨볼루션 블록
+UNet Base
 ```
-def _conv_block(self, in_ch, out_ch):
-    return nn.Sequential(
-        nn.Conv2d(in_ch, out_ch, 3, padding=1),
-        nn.ReLU(inplace=True),
-        nn.Conv2d(out_ch, out_ch, 3, padding=1),
-        nn.ReLU(inplace=True),
-    )
+class UNetDepthBase(nn.Module):
+    def __init__(self, in_channels=3, features=[64,128,256,512], use_skip=True, use_bn=False):
+        super().__init__()
+        self.use_skip = use_skip
+        self.features = features
+        self.enc1 = self._conv_block(in_channels, features[0], use_bn)
+        self.pool1 = nn.MaxPool2d(2)
+        self.enc2 = self._conv_block(features[0], features[1], use_bn)
+        self.pool2 = nn.MaxPool2d(2)
+        self.enc3 = self._conv_block(features[1], features[2], use_bn)
+        self.pool3 = nn.MaxPool2d(2)
+        self.enc4 = self._conv_block(features[2], features[3], use_bn)
+        self.pool4 = nn.MaxPool2d(2)
+
+        self.bottleneck = self._make_bottleneck(features[3], use_bn)
+
+        self.up4 = nn.ConvTranspose2d(features[3]*2, features[3], 2, 2)
+        self.dec4 = self._conv_block(features[3]*2 if use_skip else features[3], features[3], use_bn)
+
+        self.up3 = nn.ConvTranspose2d(features[3], features[2], 2, 2)
+        self.dec3 = self._conv_block(features[2]*2 if use_skip else features[2], features[2], use_bn)
+
+        self.up2 = nn.ConvTranspose2d(features[2], features[1], 2, 2)
+        self.dec2 = self._conv_block(features[1]*2 if use_skip else features[1], features[1], use_bn)
+
+        self.up1 = nn.ConvTranspose2d(features[1], features[0], 2, 2)
+        self.dec1 = self._conv_block(features[0]*2 if use_skip else features[0], features[0], use_bn)
+
+        self.conv_last = nn.Conv2d(features[0], 1, 1)
+        self.act = nn.ReLU()
+
+    def _conv_block(self, in_ch, out_ch, use_bn):
+        layers = [
+            nn.Conv2d(in_ch, out_ch, kernel_size=3, padding=1),
+            nn.BatchNorm2d(out_ch) if use_bn else nn.Identity(),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(out_ch, out_ch, kernel_size=3, padding=1),
+            nn.BatchNorm2d(out_ch) if use_bn else nn.Identity(),
+            nn.ReLU(inplace=True),
+        ]
+        return nn.Sequential(*layers)
+
+    def _make_bottleneck(self, in_ch, use_bn):
+        return self._conv_block(in_ch, in_ch * 2, use_bn)
+
+    def forward(self, x):
+        e1 = self.enc1(x)
+        e2 = self.enc2(self.pool1(e1))
+        e3 = self.enc3(self.pool2(e2))
+        e4 = self.enc4(self.pool3(e3))
+        b = self.bottleneck(self.pool4(e4))
+
+        d4 = self.up4(b)
+        d4 = self.dec4(torch.cat((d4, e4), dim=1) if self.use_skip else d4)
+
+        d3 = self.up3(d4)
+        d3 = self.dec3(torch.cat((d3, e3), dim=1) if self.use_skip else d3)
+
+        d2 = self.up2(d3)
+        d2 = self.dec2(torch.cat((d2, e2), dim=1) if self.use_skip else d2)
+
+        d1 = self.up1(d2)
+        d1 = self.dec1(torch.cat((d1, e1), dim=1) if self.use_skip else d1)
+
+        return self.act(self.conv_last(d1))
 ```
-- 두 번의 Conv2D + ReLU로 비선형 표현력을 높이고, 특징 추출 강화
-- padding=1 덕분에 출력의 spatial 크기(height, width)는 유지됨
-- 연속된 두 Conv 레이어를 사용하면 단일 Conv보다 더 복잡한 패턴 인식 가능
-- pixel 기준 3 by 3 범위를 보고 feature 추출
+인코더 (Encoder blocks)
+- self.enc1 ~ self.enc4 : 4단계 인코더 블록, 각각 채널 수가 증가 (예: 64 → 128 → 256 → 512)
+- self.pool1 ~ self.pool4 : 각 인코더 단계 뒤에 있는 MaxPool2d(2)로 공간 크기를 절반씩 줄임
+- 각 인코더 블록은 _conv_block 메서드를 사용해 구성
 
-UNET forward 구조
-```
-def forward(self, x):
-      e1 = self.enc1(x)               # [B, 64, H, W]
-      e2 = self.enc2(self.pool1(e1))  # [B, 128, H/2, W/2]
-      e3 = self.enc3(self.pool2(e2))  # [B, 256, H/4, W/4]
-      e4 = self.enc4(self.pool3(e3))  # [B, 512, H/8, W/8]
+**conv_block 메서드**
+- 2개의 3x3 컨볼루션 + 활성화 레이어로 구성
+- use_bn=True면 각 컨볼루션 뒤에 배치 정규화 포함
 
-      b  = self.bottleneck(self.pool4(e4))  # [B, 1024, H/16, W/16]
+병목 부분 (Bottleneck)
+- self.bottleneck : 가장 깊은 층에서 인코더의 마지막 출력 채널(예: 512)을 두 배(1024)로 늘린 컨볼루션 블록
 
-      d4 = self.up4(b)                      # [B, 512, H/8, W/8]
-      d4 = torch.cat((d4, e4), dim=1)       # 채널 합쳐서 [B, 1024, H/8, W/8]
-      d4 = self.dec4(d4)                    # 다시 [B, 512, H/8, W/8]
+디코더 부분 (Decoder blocks)
+- self.up4, self.up3, self.up2, self.up1 : ConvTranspose2d를 이용한 업샘플링 (업컨볼루션)
+- 예: 채널 1024 → 512, 512 → 256 등
+- 공간 크기는 두 배로 증가
+- self.dec4, self.dec3, self.dec2, self.dec1 : 업샘플링 후 처리할 컨볼루션 블록
+- 스킵 연결 사용 시 : 인코더의 동일 단계 출력과 채널을 합쳐서(Concatenate) 채널 수가 두 배가 됨
+- 스킵 연결 미사용 시 : 인코더 피쳐 없이 업샘플링된 결과만 사용 (채널 수는 원래 업샘플링된 채널 수)
 
-      d3 = self.up3(d4)                     # [B, 256, H/4, W/4]
-      d3 = torch.cat((d3, e3), dim=1)       # [B, 512, H/4, W/4]
-      d3 = self.dec3(d3)                    # [B, 256, H/4, W/4]
-
-      d2 = self.up2(d3)                     # [B, 128, H/2, W/2]
-      d2 = torch.cat((d2, e2), dim=1)       # [B, 256, H/2, W/2]
-      d2 = self.dec2(d2)                    # [B, 128, H/2, W/2]
-
-      d1 = self.up1(d2)                     # [B, 64, H, W]
-      d1 = torch.cat((d1, e1), dim=1)       # [B, 128, H, W]
-      d1 = self.dec1(d1)                    # [B, 64, H, W]
-
-      return self.act(self.conv_last(d1))
-```
-- enc1: 64 채널 출력
-- enc2: 128 채널 출력
-- enc3: 256 채널 출력
-- enc4: 512 채널 출력
-- bottlenect: 512 채널 출력
-- 채널 수 변화: 3 → 64 → 128 → 256 → 512 → 1024 → 512 → 256 → 128 → 64 → 1
+최종 출력 레이어
+- self.conv_last : 1x1 컨볼루션, 디코더 마지막 출력 채널을 1 (예: 깊이 맵)로 축소
+- self.act : ReLU 활성화 함수 (출력값을 0 이상으로 만듦)
 
 ## 4. 주요 모델 구조 설명
-공통 구조 개요
-- UNet 계열 모델은 대개 다음 4가지 단계로 구성: 인코더 (Encoder): 이미지의 점진적 압축 → 더 넓은 수용영역으로 고차원 특징 추출
-- 보틀넥 (Bottleneck): 가장 추상적인 feature 추출
-- 디코더 (Decoder): 해상도 복원 (업샘플링)
-- 마지막 출력 (Output Conv): 깊이 맵 등 목적에 맞는 단일 채널 생성
+Original UNet
+```
+class UNetDepth(UNetDepthBase):
+    def __init__(self, in_channels=3, features=[64,128,256,512]):
+        super().__init__(in_channels, features, use_skip=True, use_bn=False)
+```
 
-No Skip 디코더
+- use_skip=True: 스킵 연결(skip connection)을 사용
+- use_bn=False: 배치 정규화(Batch Normalization)를 사용x
+  
+NoSkip UNet
 ```
-self.up4 = nn.ConvTranspose2d(...)
-self.dec4 = self._conv_block(...)
+class UNetDepth_NoSkip(UNetDepthBase):
+    def __init__(self, in_channels=3, features=[64,128,256,512]):
+        super().__init__(in_channels, features, use_skip=False, use_bn=False)
 ```
-- 업샘플 후 바로 디코더 block에 입력
-- Skip 연결 없음 → 단일 정보만 활용
-
-BN conv block
+- use_skip=True: 스킵 연결(skip connection)을 사용 x
+- use_bn=False: 배치 정규화(Batch Normalization)를 사용x
+  
+BN UNet
 ```
-nn.Conv2d(...)
-nn.BatchNorm2d(...)
-nn.ReLU()
+class UNetDepth_BN(UNetDepthBase):
+    def __init__(self, in_channels=3, features=[64,128,256,512]):
+        super().__init__(in_channels, features, use_skip=True, use_bn=True)
 ```
-- Convolution 후 BN → 비선형 활성화
-- 각 단계마다 출력값 분포 정규화 → 그래디언트 흐름 원활
+- use_skip=True: 스킵 연결(skip connection)을 사용 
+- use_bn=False: 배치 정규화(Batch Normalization)를 사용
 
 ## 4. 실험 결과
 
