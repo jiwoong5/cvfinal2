@@ -238,6 +238,25 @@ def train_model(model, model_name, train_loader, device, num_epochs=300):
         model.train()
         total_loss = 0
         t0 = time.time()
+        total_batches = len(train_loader)
+
+        for batch_idx, (img, gt_depth) in enumerate(train_loader, start=1):
+            img, gt_depth = img.to(device), gt_depth.to(device)
+
+            optimizer.zero_grad()
+            pred = model(img).squeeze(1)
+            gt   = gt_depth.squeeze(1)
+
+            loss = criterion(pred, gt)
+            loss.backward()
+            optimizer.step()
+            scheduler.step()
+            step += 1
+
+            total_loss += loss.item()
+
+            progress = (batch_idx / total_batches) * 100
+            print(f"Epoch [{epoch}/{num_epochs}] Batch [{batch_idx}/{total_batches}] - Loss: {loss.item():.4f} - Progress: {progress:.2f}%", end='\r')
 
         for img, gt_depth in train_loader:
             img, gt_depth = img.to(device), gt_depth.to(device)
@@ -454,14 +473,13 @@ if __name__ == "__main__":
         (UNetDepth_NoSkip(), "UNet_NoSkip"),
         (UNetDepth_BN(), "UNet_BN")
     ]
-    '''
+    
     # 모델 훈련
     trained_model_paths = []
     for model, name in models_to_train:
         model_path = train_model(model, name, train_loader, device, num_epochs=20)
         trained_model_paths.append((model_path, type(model), name))
-    '''
-    trained_model_paths = "./best_mono_model"
+    
     # 모델 성능 비교
     results = compare_models_performance(trained_model_paths, test_loader, device)
     
