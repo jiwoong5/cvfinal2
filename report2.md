@@ -189,10 +189,10 @@ class UNetDepth_BN(UNetDepthBase):
   
 ### 4.2 정성적 평가
 
+<img src="https://github.com/jiwoong5/cvfinal2/blob/main/2_6.png" width="1200" height="600" />
 - 원본 이미지와 Ground Truth 깊이 맵 대비 각 모델의 예측 깊이 맵 시각화  
-- Original 모델은 Skip Connection을 통한 정보 전달로 전체적인 깊이 표현이 비교적 정확함  
-- NoSkip 모델은 세밀한 깊이 정보 손실이 관찰됨  
-- BatchNorm 모델은 학습 안정성과 세밀한 깊이 복원이 우수함
+- BN 이외 모델에서 깊이맵 출력이 비정상적
+- 추후 모델 학습을 epoch 를 늘려 시도 필요성 있음
 
 ## 5. 분석 및 고찰
 
