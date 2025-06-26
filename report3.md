@@ -146,6 +146,10 @@ YOLOv4 Tiny 출력 형태
 
 - 생성된 박스를 시각화하여 gt와 비교
 
+<img src="https://github.com/jiwoong5/cvfinal2/blob/main/3_quantity.png" width="1200" height="600" />
+
+- 정량적 요소로 모델 평가
+- 
 ### 6. 분석 및 고찰
 
 - 본 연구에서는 YOLOv4 Tiny 모델을 이용하여 KITTI 데이터셋 상의 객체 검출 성능을 정성적 및 정량적으로 평가하였다. 실험 결과 다음과 같은 주요 특징을 확인할 수 있었음
